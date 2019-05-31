@@ -1,0 +1,422 @@
+// simplemodel.hoc
+// Recreation of the model in Fig. 1A of Principles governing
+// dendritic inhibition ... Gidon and Segev 2012 Parameter values from
+// the notes on p. 339 left column, second paragraph from the bottom
+// from here on notated as "from the paper"
+// In addition there were values supplied by Gidon for NMDA time constants for fig 1:
+load_file("assign_NMDA_tau.hoc")
+
+// synaptic setup modified from Lavzin et al. 2012
+// 
+
+// Rm=20,000 Ohm cm2 from Gidon and Segev 2012 p. 339
+
+Rm=20000
+num_of_Ereceptors = 20 // number of excitatory receptors (in hot spot)
+num_of_Ireceptors = 2 // number of inhibitory receptors (proximal and distal to hot spot)
+
+objref  Isyn, Elist,Ilist, Inetcon, Enetcon, Inetstim, Enetstim
+objref NMDA_receptors[num_of_Ereceptors], netstims[num_of_Ereceptors]
+objref netcon[num_of_Ereceptors], dummy_nmda, dummy_netcon, soma_spike_times
+soma_spike_times = new Vector()
+// the dummy variables are used to count spikes in the soma
+objref inhibitory[num_of_Ireceptors]
+
+objref E_event_vec[num_of_Ereceptors] // records event times of excitatory receptors
+
+
+// geometry and topology ----------------------------
+
+create soma
+create dendrite
+
+dendrite {
+  L = 707 // private comm. from Gidon: the L= 1 refered to 1 space constant
+  diam = 1
+  // area = PI * diam * L
+  dendrite_area = PI * diam * L
+  nseg = 3^4 // 81 is near 100, an arbitrary number of nodes
+  inhibitory[0] = new ZoidSyn(.2)
+  inhibitory[1 ] = new ZoidSyn(1)
+
+  insert traub // contains gLbar_traub, gNabar_traub, gKbar_traub conductances for Leak, Na, K
+  // assign default values
+  // dend membrane resistance is non zero gLbar_dendrite = 0 // gLbar_traub 
+  gLbar_dendrite = 1/Rm
+  gNabar_dendrite = gNabar_traub  // paper suggests 0 however default works
+  gKbar_dendrite = gKbar_traub  // paper suggests 0 however default works
+
+  eL_dendrite = eL_traub
+//  eNa_dendrite = 65 // matches paper better than 90 orig eNa_traub
+  eNa_dendrite = eNa_traub // 90 orig eNa_traub
+  eK_dendrite = -65 // matches paper 1B better than -80 eK_traub
+
+  // assign values used for real
+  gLbar_traub = gLbar_dendrite
+  gNabar_traub = gNabar_dendrite
+  gKbar_traub = gKbar_dendrite
+}
+// working backwards:
+// rho =.1 (Gidon and Segev 2012)
+// rho defined = dendritic conductance/soma conductance
+
+rho = 0.1
+
+// the below then assigns length L and diam of soma so that rho ends up 0.1
+soma {
+  nseg = 1
+  soma_area = PI * diam * L
+  print "initial soma L and diam = ",L, ", so that area = ",soma_area, " This will be reset."
+}
+
+soma connect dendrite(0), 1 // connect the 0 end of the dendrite to the 1 end of the soma
+
+// specify pass electrical properties ---------------
+
+forall Ra=100 // 100 Ohm cm
+
+// specific capacitance was 1 um/cm2
+// since this is NEURON's default value no assignment is necessary
+
+// insert/specify active electrical properties -------------
+// the soma is electrically excitable
+
+soma {
+  insert traub // contains gLbar_traub, gNabar_traub, gKbar_traub conductances for Leak, Na, K
+  // assign default values
+  // actually dend membrane resistance is non zero gLbar_dendrite = 0 // gLbar_traub 
+
+  // objects to count spikes in the soma
+
+  dummy_nmda =new NMDA(0.5) // used as target in scheme to record spikes
+                            // from soma
+  dummy_netcon = new NetCon(&soma.v(0.5), dummy_nmda, 0, 0, 0) // last arg 0 keeps sim unchanged
+                         // source, target, thresh, delay, weight
+  dummy_netcon.record(soma_spike_times)
+}
+
+proc reset_soma_area() {
+  soma_area=dendrite_area*dendrite.gLbar_traub/(rho*(soma.gLbar_traub+soma.gNabar_traub+soma.gKbar_traub))
+  L=sqrt(soma_area/PI)
+  diam = sqrt(soma_area/PI)
+  print "reset soma area: set L and diam to ",L, ", so that area = ",soma_area
+}
+
+proc change_excitability() {
+  dendrite {
+    gLbar_traub = gLbar_dendrite
+    gNabar_traub = gNabar_dendrite
+    gKbar_traub = gKbar_dendrite
+    eL_traub = eL_dendrite
+    eNa_traub = eNa_dendrite
+    eK_traub = eK_dendrite
+  }
+  soma {
+    gLbar_traub = gLbar_soma
+    gNabar_traub = gNabar_soma
+    gKbar_traub = gKbar_soma
+    eL_traub = eL_soma
+    eNa_traub = eNa_soma
+    eK_traub = eK_soma
+  }
+}
+
+soma {
+  // assign default values
+  print "ignoring original gLbar_traub = ",gLbar_traub
+  gLbar_soma = 1/Rm // 1/gLbar_traub default was 7142 Ohm cm2 rather than 20,000
+  gNabar_soma = gNabar_traub
+  gKbar_soma = gKbar_traub
+
+  // assign functional values
+  eL_soma = eL_traub
+//  eNa_soma = 65 // matches paper better than 90 orig eNa_traub
+  eNa_soma = eNa_traub // 90 orig eNa_traub
+  eK_soma = -65 // matches paper 1B better than -80 eK_traub
+  change_excitability() // this generic function could not be called in the dendrite
+                        // setup because the soma variables were'nt ready yet
+  reset_soma_area()
+}
+
+dendrite {
+  insert traub // however set to zero with below after assigning defaults above
+  change_excitability()
+}
+
+Edel = 00// 10 // excitatory (hot spot) delay
+Idel = 00// 10 // inhibitory delay (start time actually)
+I_rise_fall = 1 // ramp up and down time
+I_plateau = 1e9 // time of plateau of (max) inhibition
+I_interval = 2e9 // arbitrary setting: interval between 
+                                           // inhibitions not used
+
+hot_spot = 0.6 // 0 < hot_spot < 1 indicates x value for receptor insertion
+
+// modified from Lavzin et al.:
+gnmdamax = 0.5e-3 // uS for 0.5 nS, from the paper
+gampamax = 0
+ggabamax_prox = 2 // 1 // 1 nS
+ggabamax_dist = 2 // 1 // 1 nS
+ETspike=50
+ENspike = 1e12 // virtually unlimited
+Enoise = 1 // on the side of completly poisson noise
+objref hbox
+hbox = new HBox() // editable parameters in a Horizontal Box
+hbox.intercept(1)
+
+objref vbox_col_1
+vbox_col_1 = new VBox()
+vbox_col_1.intercept(1)
+
+xpanel("ESynapses")
+  xlabel("Hot Spot")
+  xvalue("Delay","Edel",1,"loclocation()")
+  // xvalue("AMPA gampamax","gampamax",1,"loclocation()")
+  xvalue("NMDA gnmdamax","gnmdamax",1,"loclocation()")
+  // xvalue("AMPA Decay","decayampatc",1,"loclocation()")
+  // xvalue("NMDA Decay","decaynmdatc",1,"loclocation()")
+  xvalue("Tspike","ETspike",1,"loclocation()")
+  xvalue("Nspike","ENspike",1,"loclocation()")
+  xvalue("Nnoise","Enoise",1,"loclocation()")
+  xvalue("# of E Syn's","num_of_Ereceptors",1,"loclocation()")
+xpanel()
+xpanel("Recalculate soma area")
+  xlabel("Reset soma area to rho")
+  xbutton("reset soma area","reset_soma_area()")
+  xvalue("rho","rho")
+xpanel()
+xpanel("Event times")
+  xbutton("print excitatory event times","print_events()")
+  num_of_soma_spikes = 0
+  xvalue("number of soma spikes in last run","num_of_soma_spikes")
+  ave_isi = 0
+  xvalue("average interspike interval (ms)","ave_isi")
+  ave_f = 0
+  xvalue("average frequency (Hz)","ave_f")
+xpanel()
+vbox_col_1.intercept(0)
+vbox_col_1.map()
+
+inhibitory_erev = -65 // or value in practice -62.16
+// start with control case of no inhib
+prox_inhib=0  // these turn to one to turn inhibition on
+dist_inhib=0
+
+objref vbox_col_2
+vbox_col_2 = new VBox()
+vbox_col_2.intercept(1)
+
+xpanel("Inhibitory Synapse")
+  xlabel("Two inhibitory synapses share these:")
+  xvalue("Delay","Idel",1,"loclocation()")
+  xvalue("Inhib rise_fall ramp time","I_rise_fall",1,"loclocation()")
+// not used:  xvalue("Inhib interval","I_interval",1,"loclocation()")
+// an interval is only used if there were multiple pulses of inhibition, we
+// have just one (long) pulse
+  xvalue("Inhib plateau time","I_plateau",1,"loclocation()")
+  xvalue("inhibitory_erev","inhibitory_erev",1,"reset_inhib_erev()")
+
+  xlabel("[0], is on path, (prox. to soma)")
+  xvalue("prox GABAA: ggabamax_prox ","ggabamax_prox",1,"loclocation()")
+  xvalue("inhibitory[0].number", "prox_inhib",1, "loclocation()")
+  xlabel("and [1] off path, (distal)")
+  xvalue("dist GABAA: ggabamax_dist","ggabamax_dist",1,"loclocation()")
+  xvalue("inhibitory[1].number","dist_inhib",1,"loclocation()")
+  //xvalue("Syn #","Isyn",1,"loclocation()")
+  num_of_Ireceptors=2
+  // xlabel("numbers in parentheses show relative to hot spot at x=.6")
+xpanel()
+
+multiplicative_factor = 1
+
+xpanel("boost/decrease soma Na K")
+  xlabel("Boost/decrease soma Na K")
+  xvalue("multiplicative_factor","multiplicative_factor",1,"boost_soma_na_k()")
+  xbutton("apply again","boost_soma_na_k()")
+xpanel()
+vbox_col_2.intercept(0)
+vbox_col_2.map()
+xpanel("modify intrinsic excitability")
+  xlabel("dendrite")
+  xvalue("gLbar","gLbar_dendrite",1,"change_excitability()")
+  xvalue("gNabar","gNabar_dendrite",1,"change_excitability()")
+  xvalue("gKbar","gKbar_dendrite",1,"change_excitability()")
+  xvalue("eL","eL_dendrite",1,"change_excitability()")
+  xvalue("eNa","eNa_dendrite",1,"change_excitability()")
+  xvalue("eK","eK_dendrite",1,"change_excitability()")
+  xlabel("soma")
+  xvalue("gLbar_soma","gLbar_soma",1,"change_excitability()")
+  xvalue("gNabar_soma","gNabar_soma",1,"change_excitability()")
+  xvalue("gKbar_soma","gKbar_soma",1,"change_excitability()")
+  xvalue("eL_soma","eL_soma",1,"change_excitability()")
+  xvalue("eNa_soma","eNa_soma",1,"change_excitability()")
+  xvalue("eK_soma","eK_soma",1,"change_excitability()")
+xpanel()
+hbox.intercept(0)
+hbox.map()
+
+proc boost_soma_na_k() {
+  gNabar_soma *= multiplicative_factor
+  gKbar_soma *= multiplicative_factor
+  change_excitability()
+}
+
+objref Elist, Ilist
+Elist = new List()
+Ilist = new List()
+
+// similar to Lavzin et al. 2012
+objref shape
+shape=new Shape(0)
+// shape.view(-200, -200, 400, 400, 900, 200, 300.48, 300.32)
+// shape.view(-50, -424.547, 850, 849.095, 886, 212, 300.48, 300.16)
+shape.view(-50.0017, -59.1385, 850.003, 118.278, 150, 329, 715.2, 99.52)
+shape.show(0)
+proc make_shape_plot(){//DRAWS THE POINTS ON THE CELL
+  shape.point_mark_remove()
+  for j=0,num_of_Ereceptors-1{
+    shape.point_mark(Elist.object(j), 3, 4, 5)
+  }
+  for j=0,num_of_Ireceptors-1{
+    shape.point_mark(Ilist.object(j), 2, 4, 5)
+  }
+}//END SHAPE
+
+
+proc loclocation(){    //automatic placement of synapses called when synapse GUI changes
+// here there are usually 20 excitatory synapses at the hot spot and an inhibitory synapse
+// either on path x=0.2 or off path x=1.0 that need to be created
+    objref  Isyn, Elist,Ilist, Inetcon, Enetcon, Inetstim, Enetstim
+    objref  netcon[num_of_Ereceptors]
+    objref netstims[num_of_Ereceptors]
+    objref NMDA_receptors[num_of_Ereceptors]
+    objref inhibitory[num_of_Ireceptors]
+    objref E_event_vec[num_of_Ereceptors] // records event times of excitatory receptors
+    for i=0, num_of_Ereceptors-1 {
+        E_event_vec[i] = new Vector()
+    }
+    Isyn = new List()
+    Elist = new List()
+    Ilist = new List()
+    Inetcon = new List()
+    Enetcon = new List()
+    Inetstim = new List()
+    Enetstim = new List()
+
+    // clear old receptors
+    objref NMDA_receptors[num_of_Ereceptors]
+
+    dendrite {
+      for i = 0, num_of_Ereceptors-1 {
+        NMDA_receptors[i] = new NMDA(hot_spot)
+        NMDA_receptors[i].g = gnmdamax //0.5e-3 // uS for 0.5 nS, from the paper
+        NMDA_receptors[i].weight = 1
+	Elist.append(NMDA_receptors[i])
+
+        netstims[i] = new NetStim(0.6)  // it doesn't matter where (0.6) the netstim is placed
+        netstims[i].interval = 1000/20 // ms period of 20 Hz is equiv to 1000 ms/20 cycles per second
+                                       // which is of course 1 event every 50 ms.
+        netstims[i].noise = Enoise // completly noisy is 1, fixed frequency is 0
+        netstims[i].start = Edel
+        netstims[i].number = 1e12 // have as many spikes as the simulation can include
+        Enetstim.append(netstims[i])
+
+        netcon[i] = new NetCon(netstims[i], NMDA_receptors[i],0,0,1) // source, target, thresh, delay, weight
+        Enetcon.append(netcon[i])
+    	netcon[i].record(E_event_vec[i])
+        netcon[i].weight = gnmdamax // causes conductance to be used
+                                    // when an event occurs
+      }
+// see ZoidSyn.mod for more documentation
+      inhibitory[0]  = new ZoidSyn(0.2) // proximal inhib at 0.6-0.4
+      inhibitory[0].number=prox_inhib // 1 is inhib, 0 is no inhib
+      inhibitory[0].gmax = ggabamax_prox
+      inhibitory[0].trf = 1 // 1ms rise time and fall default
+      inhibitory[0].tp = 1e9 // go as long as simulation (when used)
+      inhibitory[0].interval = 2e9 // not used, never repeated
+
+      inhibitory[1] = new ZoidSyn(1.0) // distal inhib at 0.6+0.4
+      inhibitory[1].number=dist_inhib // 1 if used, 0 if off
+      inhibitory[1].gmax = ggabamax_dist
+      inhibitory[1].trf = 1 // 1ms rise time and fall default
+      inhibitory[1].tp = 1e9 // go as long as simulation (when used)
+      inhibitory[1].interval = 2e9 // not used, never repeated
+
+      reset_inhib_erev()
+
+      for i = 0, num_of_Ireceptors-1 {
+        Ilist.append(inhibitory[i])
+      }
+    }
+    make_shape_plot()
+    c_gmax()
+    assign_NMDA_tau() // sets rise and fall of NMDA synapses to values given by Gidon
+}//loclocation
+
+proc reset_inhib_erev() {
+      inhibitory[0].e = inhibitory_erev 
+      inhibitory[1].e = inhibitory_erev
+}
+
+proc c_gmax(){  //changes in synaptic conductances or activation parameters
+  //Excitatory synapses
+  for count=0,(num_of_Ereceptors-1) {
+    Enetstim.object(count).interval=ETspike
+    Enetstim.object(count).number=ENspike
+    Enetstim.object(count).start=Edel
+    Enetstim.object(count).noise=Enoise
+  }
+ for count=0, num_of_Ireceptors-1 {
+    inhibitory[count].interval = I_interval
+    inhibitory[count].start = Idel // inhibitory delay (start time actually)
+    inhibitory[count].trf = I_rise_fall = 1 // ramp up and down time
+    inhibitory[count].tp = I_plateau
+ }
+ inhibitory[0].g = ggabamax_prox
+ inhibitory[1].g = ggabamax_dist
+ inhibitory[0].number=prox_inhib
+ inhibitory[1].number=dist_inhib
+}
+tstop = 2000
+load_file("vgraph_run.ses")
+loclocation()
+
+proc print_events() {
+  for i=0, num_of_Ereceptors-1 {
+    print "Events for Excitatory receptor # ",i
+    E_event_vec.printf()
+  }
+}
+
+load_file("v_shape_plot.ses")
+sequence_num = 0
+strdef tmpstr
+objref outfile
+outfile = new File()
+proc save_dat_file() {
+  sprint(tmpstr,"spike_times/spike_times%d_Esyns_%d.dat",sequence_num, num_of_Ereceptors)
+  sequence_num = sequence_num + 1
+  outfile.wopen(tmpstr)
+  for i=0, soma_spike_times.size()-1 {
+    outfile.printf("%f\n",soma_spike_times.x[i])
+  }
+  outfile.close()
+}
+
+proc my_run() {
+  run()
+  num_of_soma_spikes = soma_spike_times.size()
+  if (num_of_soma_spikes>0) {
+    ave_isi = tstop/num_of_soma_spikes
+  } else {
+    ave_isi = 0
+  }
+  if ( tstop > 0 ) {
+    ave_f = 1000*num_of_soma_spikes/tstop
+  } else {
+    ave_f = 0
+  }
+  save_dat_file()
+}
+
+load_file("set_t_table.hoc")

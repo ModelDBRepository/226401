@@ -1,0 +1,187 @@
+//driver.hoc
+// runs multiple simulations and stores the results
+
+objref pc
+pc = new ParallelContext()
+strdef s
+
+min_num_syn = 1
+max_num_syn = 30
+min_pois_rate = 1
+max_pois_rate = 25
+
+min_num_syn = 3
+max_num_syn = 30
+min_pois_rate = 3
+max_pois_rate = 15
+
+// test values 200 - fast, 1000 takes about a minute,  2000 took 3 minutes (39 CPU)
+// 3000 took 5 minutes (59:35 CPU)
+// 50000 took 80 some minutes
+// 200000 is predicted to take 6 hours
+tstop = 200000 // 20 seconds of run time brings statistical significance
+// small for test runs them 50000 for production
+
+objref output_file 
+output_file = new File()
+
+system("date")
+
+strdef folder, filename
+objref inhib_gmaxs
+inhib_gmaxs=new Vector()
+inhib_gmaxs.append(1,2,3,4,5,6,7,8,9,10,11,12) // had 1,10 earlier
+// chose 12 gmaxs so could distribute over 12 cores where the 
+// pc.id from 0 to 11 will be the index into inhib_gmaxs
+
+proc run_over_synapses() {
+  for num_of_synapses = min_num_syn,max_num_syn { // could be 1 30
+    num_of_Ereceptors = num_of_synapses
+    loclocation()
+    init()
+    my_run()
+    output_file.printf("%d %-20.10g\n",num_of_synapses, ave_f)
+  }
+  // reset the number of receptors back to the default
+  num_of_Ereceptors = 20
+  loclocation()
+}
+
+proc run_over_rate() {
+  for(rate=min_pois_rate; rate <= max_pois_rate; rate=rate+1) {  // could be 1 to 25
+    ETspike = 1000/rate // period in milliseconds
+    loclocation()
+    init()
+    my_run()
+    output_file.printf("%d %-20.10g\n",rate, ave_f)
+  }
+  // reset rate back to default
+  ETspike = 1000/20 // default 50 ms period for 20 Hz
+  loclocation()
+}
+
+{
+  inhib_index = pc.id
+  system("hostname", s)
+  printf("There are %d processes. My rank is %d so inhib_index = %d and I am on %s\n", pc.nhost, pc.id, inhib_index, s)
+// instead of the below loop will farm out to different cores
+// for inhib_index=0, inhib_gmaxs.size()-1 {
+  sprint(folder,"%dnS",inhib_gmaxs.x[inhib_index])
+  print folder
+
+if (0) { // remove this section 20140219
+  // change the ranges so that when there is more inhibition there is more excitation
+//take range modification out?
+  min_pois_rate = min_pois_rate + inhib_index
+  max_pois_rate = max_pois_rate + inhib_index
+  min_num_syn = min_num_syn + inhib_index
+  max_num_syn = max_num_syn + inhib_index
+  // shift the range a bit more number of e synapses case and increasing inhibition
+   if (inhib_gmaxs.x[inhib_index] > 6) {
+    min_num_syn = min_num_syn + 5
+    max_num_syn = max_num_syn + 5
+  }
+} // removed modification of changing range of num of esyns
+  ggabamax_prox = inhib_gmaxs.x[inhib_index]
+  ggabamax_dist = inhib_gmaxs.x[inhib_index]
+  
+  // first explore firing rate in uninhibited dendrite as function of
+  // number of excitatory synapses in hot spot
+  
+  // in test runs 4 gave rate = 0.95 Hz, 14 gave rate = 39.5 Hz,
+  // the paper claimed 20, however 20 gave rate = 58.7 Hz
+  
+  output_file = new File()
+  sprint(filename, "%s/SynNum_Rate.dat", folder)
+  output_file.wopen(filename)
+  print "running cntrl case (no inhib) over num of synapses"
+  prox_inhib = 0
+  dist_inhib = 0
+  loclocation()
+  
+  run_over_synapses()
+  
+  output_file.close()
+  if (0) { // ommit section 20140218
+  sprint(filename, "%s/SynRate_CellRate.dat", folder)
+  output_file.wopen(filename)
+  
+  print "running cntrl case over poisson rates of excit syn. activation"
+  run_over_rate()
+  
+  output_file.close()
+  }
+
+  /////////////////////////////////////////////////////
+  // proximal inhibition studies
+  // 
+  
+  // first study with shunting reversal potential
+  // this means the inhibitory rev pot is the resting pot
+  
+  inhibitory_erev = -65
+  reset_inhib_erev()
+  
+  prox_inhib=1
+  dist_inhib=0
+  loclocation()
+  
+  print "ZoidSyn[0].number=",ZoidSyn[0].number
+  print "ZoidSyn[1].number=",ZoidSyn[1].number
+  sprint(filename, "%s/ProxInhib_Syn_CellRate.dat", folder)
+  output_file.wopen(filename)
+  
+  print "running prox inhib over num of syn"
+  run_over_synapses()
+  
+  output_file.close()
+  
+  if (0) { // ommit section 20140218
+  sprint(filename, "%s/ProxInhib_SynRate_CellRate.dat", folder)
+  output_file.wopen(filename)
+  
+  print "running prox inhib over poisson rates"
+  run_over_rate()
+  
+  output_file.close()
+  }  
+  // change inhibition to distal
+  
+  print "running dist inhib over num of syn"
+  
+  // now turn off the prox inhibition
+  // and on the dist inhib
+  prox_inhib = 0
+  dist_inhib = 1
+  loclocation()
+  print "inhibitory[1].number=",inhibitory[1].number
+  print "ZoidSyn[0].number=",ZoidSyn[0].number
+  print "ZoidSyn[1].number=",ZoidSyn[1].number
+  
+  sprint(filename, "%s/DistInhib_Syn_CellRate.dat", folder)
+  output_file.wopen(filename)
+  
+  run_over_synapses()
+  
+  output_file.close()
+  
+  if (0) { // ommit section 20140218
+  print "running dist inhib over cell rate"
+  sprint(filename, "%s/DistInhib_SynRate_CellRate.dat", folder)
+  output_file.wopen(filename)
+  
+  run_over_rate()
+  
+  output_file.close()
+  }
+// } // loop over different inhib max conductances
+// verify eNa's
+dendrite { print "dendrite eNa_traub = ", eNa_traub }
+soma { print "soma eNa_traub = ",eNa_traub }
+
+system("date")
+} // end of run over a runworker or the master which
+// took the place of the loop over inhib max conductances
+{pc.runworker()}
+{pc.done()}
+quit()

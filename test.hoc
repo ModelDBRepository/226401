@@ -1,0 +1,13 @@
+//test.hoc
+
+//try string functions
+
+strdef folder
+objref inhib_gmaxs
+inhib_gmaxs=new Vector()
+inhib_gmaxs.append(1,2,3,4,5,10)
+
+for i=0, inhib_gmaxs.size()-1 {
+  sprint(folder,"%dnS",inhib_gmaxs.x[i])
+  print folder
+}

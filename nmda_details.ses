@@ -1,0 +1,16 @@
+objectvar save_window_, rvp_
+objectvar scene_vector_[8]
+objectvar ocbox_, ocbox_list_, scene_, scene_list_
+{ocbox_list_ = new List()  scene_list_ = new List()}
+{
+save_window_ = new Graph(0)
+save_window_.size(0,2100,-1,1)
+scene_vector_[7] = save_window_
+{save_window_.view(0, -1, 2100, 2, 76, 201, 677.76, 253.12)}
+graphList[1].append(save_window_)
+save_window_.save_name("graphList[1].")
+save_window_.addexpr("NMDA_receptors[1].B-NMDA_receptors[1].A", 1, 1, 0.525212, 0.987231, 2)
+// save_window_.addexpr("NMDA_receptors[1].NMDA_saturation_fact*NMDA_receptors[1].weight", 2, 1, 0.284419, 0.964475, 2)
+}
+objectvar scene_vector_[1]
+{doNotify()}

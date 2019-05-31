@@ -1,0 +1,29 @@
+objectvar save_window_, rvp_
+objectvar scene_vector_[6]
+objectvar ocbox_, ocbox_list_, scene_, scene_list_
+{ocbox_list_ = new List()  scene_list_ = new List()}
+{
+save_window_ = new PlotShape(0)
+save_window_.size(-8.22392,757.766,-382.995,382.995)
+save_window_.variable("v")
+scene_vector_[4] = save_window_
+{save_window_.view(-8.22392, -382.995, 765.99, 765.99, 520, 103, 200.64, 200.32)}
+fast_flush_list.append(save_window_)
+save_window_.save_name("fast_flush_list.")
+}
+{
+save_window_ = new Graph(0)
+save_window_.size(0,791.083,-80,40)
+scene_vector_[5] = save_window_
+{save_window_.view(0, -80, 791.083, 120, 1024, 309, 300.48, 200.32)}
+flush_list.append(save_window_)
+save_window_.save_name("flush_list.")
+objectvar rvp_
+rvp_ = new RangeVarPlot("v")
+soma rvp_.begin(0)
+dendrite rvp_.end(1)
+rvp_.origin(0)
+save_window_.addobject(rvp_, 2, 1, 0.8, 0.9)
+}
+objectvar scene_vector_[1]
+{doNotify()}

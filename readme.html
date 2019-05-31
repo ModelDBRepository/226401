@@ -1,0 +1,46 @@
+<html><pre>
+This is the readme for a model associated with the paper:
+
+Gidon A, Segev I (2012) Principles governing the operation of synaptic
+inhibition in dendrites. Neuron 75:330-41
+
+This NEURON model was contributed by Tom Morse, who acknowledges the
+help of A. Gidon in supplying information about the excitatory synapses
+although the result is more general than that.
+
+In the paper figure 1 a simple neuron whose shape contains a dendrite
+with a soma at one end is examined.  It has a "hotspot" of excitatory
+activity 0.6th of the way from the soma (0) to the distal end (1).
+Traces are shown in Figure 1B for two cases 1) where there is
+inhibition near the soma and 2) where there is inhibition on the
+distal end of the dendrite.
+
+A model was re-created to examine the firing rate of the simple neuron
+under the papers conditions (and a variety of inhibition strengths)
+and the papers Fig1B result and conclusion is supported.
+
+
+Usage:
+------
+The code was run on the Louise cluster which is part of the High
+Performance Computing Cluster at Yale. Use:
+
+qsub -q general parallel_run.sh
+
+to start.
+
+Once the job finishes the matlab scripts and commands by hand to select
+a subset of all the inhibitions tested can be run to generate the
+following figure which compares the firing rate shown in the traces of
+Figure 1B to different inhibitory strengths at the distal and proximal
+ends of the dendrite:
+
+<img src="./Fig1BModels.png" alt="Fig1B models firing rates" width="650">
+
+The lines that are drawn on the graph that represent fig 1B in the
+paper are the estimated firing rates measured from fig 1B:
+
+proximal inhibited firing rate: 32 spikes/2000 ms = 16 Hz
+distal inhibited firing rate: 12 spikes/2000 ms = 6 Hz
+
+</pre></html>

@@ -1,0 +1,36 @@
+// demo_nmda.hoc
+// loads the t_table in exp2synNMDA.mod
+
+load_file("set_t_table.hoc")
+
+
+// test the saturating NMDA conductance by a series of pulses
+objref ns, nc
+tstop = 1000
+objref E_event_vec
+E_event_vec = new Vector()
+Enoise = 0 // 0 is uniform, 1 is poisson
+Edel = 5 // delay to start time
+gnmdamax = 1
+period = 1000/50
+
+num_of_events = 40
+load_file("run_cntrl_g.ses")
+
+proc test_run() {
+  ns = new NetStim(0.5)
+  ns.interval = period
+  ns.noise = Enoise // completly noisy is 1, fixed frequency is 0
+  ns.start = Edel
+  ns.number = num_of_events // have as many spikes as the simulation can include
+  nc = new NetCon(ns,dummy_synapse ,0,0,1) // source, target, thresh, delay, weight
+  nc.record(E_event_vec)
+  nc.weight = gnmdamax // causes conductance to be used
+                       // when an event occurs
+  init()
+  run()
+  // g_g.exec_menu("View = plot")
+
+}
+load_file("A_B_graph.ses")
+test_run()

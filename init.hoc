@@ -1,0 +1,4 @@
+load_file("nrngui.hoc")
+load_file("simplemodel.hoc")
+load_file("runctrl.ses")
+load_file("vgraph.ses")

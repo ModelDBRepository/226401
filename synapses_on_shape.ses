@@ -1,0 +1,12 @@
+objectvar save_window_, rvp_
+objectvar scene_vector_[6]
+objectvar ocbox_, ocbox_list_, scene_, scene_list_
+{ocbox_list_ = new List()  scene_list_ = new List()}
+{
+save_window_ = new Shape(0)
+save_window_.size(-50.0017,800.002,-59.1385,59.1394)
+scene_vector_[2] = save_window_
+{save_window_.view(-50.0017, -59.1385, 850.003, 118.278, 150, 329, 715.2, 99.52)}
+}
+objectvar scene_vector_[1]
+{doNotify()}

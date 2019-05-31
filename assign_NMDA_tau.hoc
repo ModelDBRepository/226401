@@ -1,0 +1,33 @@
+// assign_NMDA_tau.hoc
+// assigns the time constants to those given by Gidon (personal communication):
+//
+// The NMDA synapse is a standard two exponential with Jahr and Stevens Mg gate.
+// 
+// mggate = 1 / (1 + exp(0.062 (/mV) * -v) * (mg / 3.57 (mM)))
+// 
+// g = gmax*(B - A)*mggate
+// 
+// ... Sarid et al., 2007 used
+// 
+// syn.gmax = 0.5e-3//15e-3
+//
+// syn.tau_r = 0.5
+// 
+// syn.tau_d = 44
+// 
+// syn.mg = 1
+// 
+ 
+tau_up = 0.5
+tau_down = 44
+
+objref nmda_list
+nmda_list = new List("NMDA")
+
+proc assign_NMDA_tau() {
+    nmda_list = new List("NMDA")
+    for i=0, nmda_list.count()-1 {
+        nmda_list.object(i).tau1 = tau_up
+        nmda_list.object(i).tau2 = tau_down
+    }
+}
